@@ -1,22 +1,5 @@
 #!/usr/bin/env bash
 
-# Proxmox LXC Creation Script for Standard Notes
-# Author: [Tu Nombre o Usuario de GitHub]
-# License: MIT
-# Source: https://github.com/bitmodular/Proxmox-Scripts
-
-set -e
-
-# Variables
-CTID=250
-CT_NAME="standardnotes"
-TEMPLATE="local:vztmpl/debian-12-standard_12.0-1_amd64.tar.zst"
-STORAGE="local-lvm"
-DISK_SIZE="4G"
-MEMORY="512"
-CPUS="1"
-NET="name=eth0,bridge=vmbr0,ip=dhcp"
-
 # Función para mostrar mensajes de información
 msg_info() {
   echo -e "\e[34m[INFO]\e[0m $1"
@@ -32,22 +15,42 @@ msg_error() {
   echo -e "\e[31m[ERROR]\e[0m $1"
 }
 
-msg_info "Creando el contenedor LXC con ID $CTID y nombre $CT_NAME..."
-pct create $CTID $TEMPLATE -storage $STORAGE -rootfs $DISK_SIZE -memory $MEMORY -cores $CPUS -net0 $NET -hostname $CT_NAME --unprivileged 1 --features nesting=1
+# Función para obtener el ID más bajo disponible para un contenedor LXC
+get_next_container_id() {
+  # Obtener la lista de contenedores existentes y filtrar los IDs
+  local used_ids
+  used_ids=$(pct list | awk '{print $1}' | tail -n +2)  # Obtener todos los IDs en uso
+  local next_id=100  # Comenzar con el ID mínimo disponible (ajustable según tu configuración)
 
-msg_info "Iniciando el contenedor..."
-pct start $CTID
+  # Buscar el primer ID libre
+  while echo "$used_ids" | grep -qw "$next_id"; do
+    next_id=$((next_id + 1))  # Incrementar el ID hasta encontrar uno libre
+  done
 
-msg_info "Esperando a que el contenedor inicie completamente..."
-sleep 10
+  echo "$next_id"
+}
 
-msg_info "Descargando el script de instalación de Standard Notes en el contenedor..."
-pct exec $CTID -- bash -c "curl -fsSL https://raw.githubusercontent.com/bitmodular/Proxmox-Scripts/main/ct/standardnotes.sh -o /root/standardnotes.sh"
+# Obtener el próximo ID de contenedor disponible
+CT_ID=$(get_next_container_id)
+CT_NAME="standardnotes"
 
-msg_info "Asignando permisos de ejecución al script..."
-pct exec $CTID -- chmod +x /root/standardnotes.sh
+# Ajuste del tamaño del disco
+DISK_SIZE="8G"  # Tamaño del disco, puedes ajustarlo
 
-msg_info "Ejecutando el script de instalación dentro del contenedor..."
-pct exec $CTID -- bash /root/standardnotes.sh
+# Crear el contenedor LXC con el ID dinámico
+msg_info "Creando el contenedor LXC con ID $CT_ID y nombre $CT_NAME..."
 
-msg_ok "Contenedor creado e instalación de Standard Notes completada."
+pct create $CT_ID /var/lib/vz/template/cache/debian-10-standard_10.7-1_amd64.tar.gz \
+    -hostname $CT_NAME \
+    -memory 2048 \
+    -swap 512 \
+    -cores 2 \
+    -net0 name=eth0,bridge=vmbr0,ip=dhcp \
+    -rootfs local-lvm:$DISK_SIZE,backup=0  # Ajuste para el tamaño del disco
+
+msg_ok "Contenedor LXC $CT_ID creado correctamente."
+
+# Configuración posterior para instalar Standard Notes en el contenedor
+msg_info "Configurando Standard Notes en el contenedor..."
+pct exec $CT_ID -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/bitmodular/Proxmox-Scripts/main/install_standardnotes.sh)"
+msg_ok "Standard Notes instalado correctamente en el contenedor $CT_ID."
