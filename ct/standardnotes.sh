@@ -34,10 +34,13 @@ apt-get install -y nodejs
 msg_info "Instalando PostgreSQL..."
 apt-get install -y postgresql postgresql-contrib
 
+msg_info "Generando una contraseña segura para la base de datos..."
+DB_PASS=$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9' | cut -c1-13)
+
 msg_info "Configurando PostgreSQL para Standard Notes..."
 sudo -u postgres psql <<EOF
 CREATE DATABASE standardnotes;
-CREATE USER snuser WITH ENCRYPTED PASSWORD 'supersecurepassword';
+CREATE USER snuser WITH ENCRYPTED PASSWORD '$DB_PASS';
 GRANT ALL PRIVILEGES ON DATABASE standardnotes TO snuser;
 EOF
 
@@ -56,7 +59,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_DATABASE=standardnotes
 DB_USERNAME=snuser
-DB_PASSWORD=supersecurepassword
+DB_PASSWORD=$DB_PASS
 EOF
 
 msg_info "Ejecutando migraciones y sembrando la base de datos..."
@@ -77,16 +80,4 @@ User=root
 Environment=NODE_ENV=production
 Environment=DB_CONNECTION=pg
 Environment=DB_HOST=localhost
-Environment=DB_PORT=5432
-Environment=DB_DATABASE=standardnotes
-Environment=DB_USERNAME=snuser
-Environment=DB_PASSWORD=supersecurepassword
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl enable standardnotes
-systemctl start standardnotes
-
-msg_ok "Standard Notes instalado y ejecutándose correctamente."
+Environment=
