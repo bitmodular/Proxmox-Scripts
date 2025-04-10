@@ -17,9 +17,9 @@ msg_error() {
 
 # Función para obtener el ID más bajo disponible para un contenedor LXC
 get_next_container_id() {
-  # Obtener la lista de contenedores existentes y filtrar los IDs
+  # Obtener la lista de contenedores existentes en todos los nodos
   local used_ids
-  used_ids=$(pct list | awk '{print $1}' | tail -n +2)  # Obtener todos los IDs en uso
+  used_ids=$(pveam list | grep "container" | awk '{print $1}' | tail -n +2)  # Obtener todos los IDs en uso
   local next_id=100  # Comenzar con el ID mínimo disponible (ajustable según tu configuración)
 
   # Buscar el primer ID libre
@@ -37,7 +37,7 @@ CT_NAME="standardnotes"
 # Ajuste del tamaño del disco
 DISK_SIZE="8G"  # Tamaño del disco, puedes ajustarlo
 
-# Verificar si el contenedor ya existe
+# Verificar si el contenedor ya existe en el nodo actual
 if pct list | grep -qw "$CT_ID"; then
   msg_error "El contenedor LXC con ID $CT_ID ya existe. Intentando usar otro ID."
   CT_ID=$(get_next_container_id)
